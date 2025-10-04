@@ -135,25 +135,25 @@ export default function ImportExport() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Import/Export</h2>
+      <h2 className="text-2xl font-bold text-white mb-6">Import/Export</h2>
 
       {/* Message Area */}
       {message && (
-        <div className={`mb-6 p-4 rounded-lg ${
-          message.type === 'success' ? 'bg-green-50 border border-green-200' :
-          message.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
-          'bg-red-50 border border-red-200'
+        <div className={`mb-6 p-4 rounded-lg border ${
+          message.type === 'success' ? 'bg-green-900 bg-opacity-20 border-green-700' :
+          message.type === 'warning' ? 'bg-yellow-900 bg-opacity-20 border-yellow-700' :
+          'bg-red-900 bg-opacity-20 border-red-700'
         }`}>
           <p className={`text-sm whitespace-pre-line ${
-            message.type === 'success' ? 'text-green-800' :
-            message.type === 'warning' ? 'text-yellow-800' :
-            'text-red-800'
+            message.type === 'success' ? 'text-green-300' :
+            message.type === 'warning' ? 'text-yellow-300' :
+            'text-red-300'
           }`}>
             {message.text}
           </p>
           <button
             onClick={() => setMessage(null)}
-            className="mt-2 text-sm underline"
+            className="mt-2 text-sm underline text-gray-300 hover:text-white"
           >
             Dismiss
           </button>
@@ -162,23 +162,23 @@ export default function ImportExport() {
 
       <div className="space-y-6">
         {/* JSON Save/Load */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">JSON Data</h3>
-          <p className="text-gray-600 mb-4">
+        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4">JSON Data</h3>
+          <p className="text-gray-300 mb-4">
             Save your data as a JSON file for backup or transfer between computers.
           </p>
 
           <div className="flex gap-3">
             <button
               onClick={handleDownloadJSON}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
             >
               Download JSON
             </button>
 
             <button
               onClick={() => jsonFileInputRef.current.click()}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
             >
               Upload JSON
             </button>
@@ -194,18 +194,18 @@ export default function ImportExport() {
         </div>
 
         {/* CSV Import Section */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Import from CSV</h3>
+        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4">Import from CSV</h3>
 
           {/* Import Roles */}
           <div className="mb-6">
-            <h4 className="font-medium mb-2">Import Roles</h4>
-            <p className="text-sm text-gray-600 mb-3">
+            <h4 className="font-medium text-white mb-2">Import Roles</h4>
+            <p className="text-sm text-gray-400 mb-3">
               Format: Name, Roles (comma-separated)
             </p>
             <button
               onClick={() => rolesFileInputRef.current.click()}
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
             >
               Choose Roles CSV
             </button>
@@ -220,20 +220,20 @@ export default function ImportExport() {
 
           {/* Import Availability */}
           <div>
-            <h4 className="font-medium mb-2">Import Availability</h4>
-            <p className="text-sm text-gray-600 mb-3">
+            <h4 className="font-medium text-white mb-2">Import Availability</h4>
+            <p className="text-sm text-gray-400 mb-3">
               Format: Name, Start Date, End Date, Reason
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => availabilityFileInputRef.current.click()}
-                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
               >
                 Choose Availability CSV
               </button>
               <button
                 onClick={handleCleanupDuplicates}
-                className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors"
               >
                 Clean Up Duplicates
               </button>
@@ -249,9 +249,9 @@ export default function ImportExport() {
         </div>
 
         {/* Export Schedule Section */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Export Schedule</h3>
-          <p className="text-gray-600 mb-4">
+        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4">Export Schedule</h3>
+          <p className="text-gray-300 mb-4">
             Export your current schedule to CSV or PDF format.
           </p>
 
@@ -259,7 +259,7 @@ export default function ImportExport() {
             <button
               onClick={handleExportCSV}
               disabled={!schedule || !schedule.meetings || schedule.meetings.length === 0}
-              className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
             >
               Export to CSV
             </button>
@@ -267,28 +267,28 @@ export default function ImportExport() {
             <button
               onClick={handleExportPDF}
               disabled={!schedule || !schedule.meetings || schedule.meetings.length === 0}
-              className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
             >
               Export to PDF
             </button>
           </div>
 
           {(!schedule || !schedule.meetings || schedule.meetings.length === 0) && (
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-sm text-gray-400 mt-2">
               Generate a schedule first to enable export
             </p>
           )}
         </div>
 
         {/* Clear Data */}
-        <div className="bg-white p-6 rounded-lg shadow border-2 border-red-200">
-          <h3 className="text-lg font-semibold mb-4 text-red-700">Danger Zone</h3>
-          <p className="text-gray-600 mb-4">
+        <div className="bg-gray-800 p-6 rounded-lg border-2 border-red-700">
+          <h3 className="text-lg font-semibold mb-4 text-red-400">Danger Zone</h3>
+          <p className="text-gray-300 mb-4">
             Remove everything (people, roles, schedules). Use this before importing your own data from CSV.
           </p>
           <button
             onClick={clearAllData}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
           >
             Clear All Data
           </button>
