@@ -190,15 +190,50 @@ export function AppProvider({ children }) {
     });
   };
 
+  // Role Order Management
+  const updateRoleOrder = (newOrder) => {
+    setSettings({
+      ...settings,
+      roleOrder: newOrder
+    });
+  };
+
+  const initializeRoleOrder = () => {
+    if (!settings.roleOrder || settings.roleOrder.length === 0) {
+      if (roles.length > 0) {
+        const defaultOrder = roles.map(r => r.id);
+        updateRoleOrder(defaultOrder);
+      }
+    }
+  };
+
+  // Initialize roleOrder when roles are loaded
+  useEffect(() => {
+    if (roles.length > 0 && (!settings.roleOrder || settings.roleOrder.length === 0)) {
+      const defaultOrder = roles.map(r => r.id);
+      setSettings(prev => ({
+        ...prev,
+        roleOrder: defaultOrder
+      }));
+    }
+  }, [roles.length]); // Only run when roles length changes
+
   // Omitted Dates CRUD
-  const addOmittedDate = (date, reason = '') => {
+  const addOmittedDate = (date, comment = '', showOnSchedule = false) => {
     const newOmittedDate = {
       id: Date.now().toString(),
       date: new Date(date),
-      reason
+      comment,
+      showOnSchedule
     };
     setOmittedDates([...omittedDates, newOmittedDate]);
     return newOmittedDate;
+  };
+
+  const updateOmittedDate = (id, updates) => {
+    setOmittedDates(omittedDates.map(od =>
+      od.id === id ? { ...od, ...updates } : od
+    ));
   };
 
   const deleteOmittedDate = (id) => {
@@ -247,6 +282,95 @@ export function AppProvider({ children }) {
     });
   };
 
+  // Delete last X meetings from schedule
+  const deleteLastMeetings = (count) => {
+    if (!schedule || !schedule.meetings || schedule.meetings.length === 0) {
+      return false;
+    }
+
+    const numToDelete = parseInt(count, 10);
+    if (isNaN(numToDelete) || numToDelete < 1 || numToDelete > schedule.meetings.length) {
+      return false;
+    }
+
+    setSchedule(prevSchedule => {
+      const remainingMeetings = prevSchedule.meetings.slice(0, -numToDelete);
+
+      // If no meetings remain, return null schedule
+      if (remainingMeetings.length === 0) {
+        return null;
+      }
+
+      // Renumber meetings sequentially
+      const renumberedMeetings = remainingMeetings.map((meeting, index) => ({
+        ...meeting,
+        meetingNo: index + 1
+      }));
+
+      return {
+        ...prevSchedule,
+        meetings: renumberedMeetings,
+        endDate: renumberedMeetings[renumberedMeetings.length - 1].date
+      };
+    });
+
+    return true;
+  };
+
+  // Clear all historic (past) meetings from schedule
+  const clearHistoricMeetings = () => {
+    if (!schedule || !schedule.meetings || schedule.meetings.length === 0) {
+      return { success: false, historicCount: 0, futureCount: 0 };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Separate historic and future meetings
+    const historicMeetings = schedule.meetings.filter(meeting => {
+      const meetingDate = new Date(meeting.date);
+      meetingDate.setHours(0, 0, 0, 0);
+      return meetingDate < today;
+    });
+
+    const futureMeetings = schedule.meetings.filter(meeting => {
+      const meetingDate = new Date(meeting.date);
+      meetingDate.setHours(0, 0, 0, 0);
+      return meetingDate >= today;
+    });
+
+    // If no historic meetings, nothing to do
+    if (historicMeetings.length === 0) {
+      return { success: false, historicCount: 0, futureCount: futureMeetings.length };
+    }
+
+    setSchedule(prevSchedule => {
+      // If no future meetings remain, return null schedule
+      if (futureMeetings.length === 0) {
+        return null;
+      }
+
+      // Renumber meetings sequentially
+      const renumberedMeetings = futureMeetings.map((meeting, index) => ({
+        ...meeting,
+        meetingNo: index + 1
+      }));
+
+      return {
+        ...prevSchedule,
+        meetings: renumberedMeetings,
+        startDate: renumberedMeetings[0].date
+        // endDate stays the same (last meeting date)
+      };
+    });
+
+    return {
+      success: true,
+      historicCount: historicMeetings.length,
+      futureCount: futureMeetings.length
+    };
+  };
+
   const value = {
     people,
     setPeople,
@@ -267,13 +391,18 @@ export function AppProvider({ children }) {
     clearAllData,
     updateMeetingDays,
     lockMeetingDays,
+    updateRoleOrder,
+    initializeRoleOrder,
     addOmittedDate,
+    updateOmittedDate,
     deleteOmittedDate,
     isDateOmitted,
     addSpecialMeeting,
     updateSpecialMeeting,
     deleteSpecialMeeting,
-    findSpecialMeetingByDate
+    findSpecialMeetingByDate,
+    deleteLastMeetings,
+    clearHistoricMeetings
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

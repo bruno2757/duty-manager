@@ -9,7 +9,7 @@ import {
 } from '../utils/importExport';
 
 export default function ImportExport() {
-  const { people, setPeople, roles, setRoles, schedule, getStateForExport, loadFromJSON, clearAllData } = useApp();
+  const { people, setPeople, roles, setRoles, schedule, getStateForExport, loadFromJSON, clearAllData, settings } = useApp();
   const jsonFileInputRef = useRef(null);
   const rolesFileInputRef = useRef(null);
   const availabilityFileInputRef = useRef(null);
@@ -104,7 +104,7 @@ export default function ImportExport() {
 
   const handleExportCSV = () => {
     try {
-      exportScheduleToCSV(schedule, roles, people);
+      exportScheduleToCSV(schedule, roles, people, settings.roleOrder);
       setMessage({ type: 'success', text: 'Schedule exported to CSV successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'Error exporting CSV: ' + error.message });
@@ -113,7 +113,7 @@ export default function ImportExport() {
 
   const handleExportPDF = () => {
     try {
-      exportScheduleToPDF(schedule, roles, people);
+      exportScheduleToPDF(schedule, roles, people, settings.roleOrder);
       setMessage({ type: 'success', text: 'Schedule exported to PDF successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'Error exporting PDF: ' + error.message });

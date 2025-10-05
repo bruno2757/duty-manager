@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useApp } from '../contexts/AppContext';
 import { formatDate } from '../utils/dateUtils';
+import { getOrderedRoles } from '../utils/roleUtils';
 
 export default function ScheduleTable({ schedule }) {
-  const { people, roles, setSchedule } = useApp();
+  const { people, roles, setSchedule, settings } = useApp();
   const [editingCell, setEditingCell] = useState(null); // { meetingId, roleId }
+
+  // Get roles in configured order
+  const orderedRoles = useMemo(() => {
+    return getOrderedRoles(roles, settings.roleOrder);
+  }, [roles, settings.roleOrder]);
 
   const handleAssignmentChange = (meetingId, roleId, newPersonId) => {
     const updatedMeetings = schedule.meetings.map(meeting => {
@@ -49,6 +55,9 @@ export default function ScheduleTable({ schedule }) {
   };
 
   const getRowColorClass = (meeting) => {
+    if (meeting.type === 'omitted') {
+      return 'bg-gray-700 bg-opacity-50';
+    }
     const hasHardConflict = Object.values(meeting.duties).some(duty => duty.hasConflict);
     const hasUnfilled = Object.values(meeting.duties).some(duty => !duty.personId);
 
@@ -70,7 +79,7 @@ export default function ScheduleTable({ schedule }) {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">No.</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Day</th>
-              {roles.map(role => (
+              {orderedRoles.map(role => (
                 <th key={role.id} className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                   {role.name}
                   {role.allowGrouping && (
@@ -102,61 +111,69 @@ export default function ScheduleTable({ schedule }) {
                     {meeting.day}
                   </span>
                 </td>
-                {roles.map(role => {
-                  const duty = meeting.duties[role.id];
-                  const isEditing = editingCell?.meetingId === meeting.id &&
-                                   editingCell?.roleId === role.id;
+                {meeting.type === 'omitted' ? (
+                  <td colSpan={orderedRoles.length} className="px-4 py-3 text-sm text-center">
+                    <span className="italic text-gray-400">
+                      NO MEETING{meeting.comment ? ` - ${meeting.comment}` : ''}
+                    </span>
+                  </td>
+                ) : (
+                  orderedRoles.map(role => {
+                    const duty = meeting.duties[role.id];
+                    const isEditing = editingCell?.meetingId === meeting.id &&
+                                     editingCell?.roleId === role.id;
 
-                  return (
-                    <td key={role.id} className="px-4 py-3 text-sm">
-                      {isEditing ? (
-                        <select
-                          autoFocus
-                          value={duty?.personId || ''}
-                          onChange={(e) => handleAssignmentChange(
-                            meeting.id,
-                            role.id,
-                            e.target.value || null
-                          )}
-                          onBlur={() => setEditingCell(null)}
-                          className="w-full px-2 py-1 bg-gray-700 border border-gray-600 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        >
-                          <option value="">- Unassigned -</option>
-                          {people
-                            .filter(p => role.peopleIds.includes(p.id))
-                            .map(person => (
-                              <option key={person.id} value={person.id}>
-                                {person.name}
-                              </option>
-                            ))}
-                        </select>
-                      ) : (
-                        <button
-                          onClick={() => setEditingCell({ meetingId: meeting.id, roleId: role.id })}
-                          className="text-left w-full text-gray-200 hover:text-purple-400 hover:underline transition-colors"
-                        >
-                          {duty?.personId ? (
-                            <span>
-                              {getPersonName(duty.personId)}
-                              {duty.manuallyAssigned && (
-                                <span className="ml-1 text-xs text-blue-400" title="Manually assigned">
-                                  ✓
-                                </span>
-                              )}
-                              {duty.hasConflict && (
-                                <span className="ml-1 text-xs text-red-400" title="Has conflict">
-                                  ⚠
-                                </span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="text-gray-500">-</span>
-                          )}
-                        </button>
-                      )}
-                    </td>
-                  );
-                })}
+                    return (
+                      <td key={role.id} className="px-4 py-3 text-sm">
+                        {isEditing ? (
+                          <select
+                            autoFocus
+                            value={duty?.personId || ''}
+                            onChange={(e) => handleAssignmentChange(
+                              meeting.id,
+                              role.id,
+                              e.target.value || null
+                            )}
+                            onBlur={() => setEditingCell(null)}
+                            className="w-full px-2 py-1 bg-gray-700 border border-gray-600 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          >
+                            <option value="">- Unassigned -</option>
+                            {people
+                              .filter(p => role.peopleIds.includes(p.id))
+                              .map(person => (
+                                <option key={person.id} value={person.id}>
+                                  {person.name}
+                                </option>
+                              ))}
+                          </select>
+                        ) : (
+                          <button
+                            onClick={() => setEditingCell({ meetingId: meeting.id, roleId: role.id })}
+                            className="text-left w-full text-gray-200 hover:text-purple-400 hover:underline transition-colors"
+                          >
+                            {duty?.personId ? (
+                              <span>
+                                {getPersonName(duty.personId)}
+                                {duty.manuallyAssigned && (
+                                  <span className="ml-1 text-xs text-blue-400" title="Manually assigned">
+                                    ✓
+                                  </span>
+                                )}
+                                {duty.hasConflict && (
+                                  <span className="ml-1 text-xs text-red-400" title="Has conflict">
+                                    ⚠
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">-</span>
+                            )}
+                          </button>
+                        )}
+                      </td>
+                    );
+                  })
+                )}
               </tr>
             ))}
           </tbody>

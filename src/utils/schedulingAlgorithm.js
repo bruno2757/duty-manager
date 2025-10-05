@@ -99,6 +99,11 @@ export function generateSchedule({
     const meeting = meetings[i];
     scheduleAssignments[meeting.id] = {};
 
+    // Skip duty assignment for omitted meetings
+    if (meeting.type === 'omitted') {
+      continue;
+    }
+
     // Sort roles by constraint level (most constrained first)
     const sortedRoles = [...roles].sort((a, b) => {
       // Roles with fewer people are more constrained

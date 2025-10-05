@@ -25,12 +25,12 @@ export function generateMeetingDates(startDate, weeks = 4, cancelledDates = [], 
   const midweekDayNum = dayMap[midweekDay];
   const weekendDayNum = dayMap[weekendDay];
 
-  // Normalize omitted dates for comparison
-  const omittedSet = new Set();
+  // Create map of omitted dates with their details
+  const omittedDatesMap = new Map();
   omittedDates.forEach(od => {
     const date = new Date(od.date);
     date.setHours(0, 0, 0, 0);
-    omittedSet.add(date.getTime());
+    omittedDatesMap.set(date.getTime(), od);
   });
 
   // Create map of special meetings by date
@@ -67,9 +67,29 @@ export function generateMeetingDates(startDate, weeks = 4, cancelledDates = [], 
     // Only include configured meeting days for regular meetings
     if (dayOfWeek === midweekDayNum || dayOfWeek === weekendDayNum) {
       const dateTime = new Date(currentDate).getTime();
+      const omittedDate = omittedDatesMap.get(dateTime);
 
-      // Skip if in cancelled dates or omitted dates
-      if (!cancelledSet.has(dateTime) && !omittedSet.has(dateTime)) {
+      // Skip if in cancelled dates
+      if (cancelledSet.has(dateTime)) {
+        currentDate.setDate(currentDate.getDate() + 1);
+        continue;
+      }
+
+      // Check if omitted
+      if (omittedDate) {
+        // Only include if showOnSchedule is true
+        if (omittedDate.showOnSchedule) {
+          meetings.push({
+            date: new Date(currentDate),
+            day: dayOfWeek === midweekDayNum ? midweekDay : weekendDay,
+            type: 'omitted',
+            comment: omittedDate.comment || 'NO MEETING',
+            isSpecial: false
+          });
+        }
+        // Skip to next date (whether shown or not, no duties assigned)
+      } else {
+        // Not omitted - check for special or regular meeting
         const specialMeeting = specialMeetingsMap.get(dateTime);
 
         if (specialMeeting) {

@@ -2,12 +2,14 @@ import { useState, useMemo } from 'react';
 import { useApp } from '../../contexts/AppContext';
 
 export default function OmittedMeetingsPage() {
-  const { settings, omittedDates, addOmittedDate, deleteOmittedDate, isDateOmitted } = useApp();
+  const { settings, omittedDates, addOmittedDate, updateOmittedDate, deleteOmittedDate, isDateOmitted } = useApp();
   const [formData, setFormData] = useState({
     date: '',
-    reason: ''
+    comment: '',
+    showOnSchedule: false
   });
   const [errors, setErrors] = useState({});
+  const [editingId, setEditingId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Get day name from date string
@@ -53,14 +55,38 @@ export default function OmittedMeetingsPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const validation = validateDate(formData.date);
-    if (!validation.valid) {
-      setErrors({ date: validation.error });
-      return;
+    if (!editingId) {
+      const validation = validateDate(formData.date);
+      if (!validation.valid) {
+        setErrors({ date: validation.error });
+        return;
+      }
+      addOmittedDate(formData.date, formData.comment, formData.showOnSchedule);
+    } else {
+      updateOmittedDate(editingId, {
+        comment: formData.comment,
+        showOnSchedule: formData.showOnSchedule
+      });
     }
 
-    addOmittedDate(formData.date, formData.reason);
-    setFormData({ date: '', reason: '' });
+    setFormData({ date: '', comment: '', showOnSchedule: false });
+    setEditingId(null);
+    setErrors({});
+  };
+
+  const handleEdit = (omittedDate) => {
+    setFormData({
+      date: new Date(omittedDate.date).toISOString().split('T')[0],
+      comment: omittedDate.comment || omittedDate.reason || '', // Handle migration
+      showOnSchedule: omittedDate.showOnSchedule ?? false
+    });
+    setEditingId(omittedDate.id);
+    setErrors({});
+  };
+
+  const handleCancelEdit = () => {
+    setFormData({ date: '', comment: '', showOnSchedule: false });
+    setEditingId(null);
     setErrors({});
   };
 
@@ -111,9 +137,11 @@ export default function OmittedMeetingsPage() {
         </p>
       </div>
 
-      {/* Add Form */}
+      {/* Add/Edit Form */}
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Add Omitted Meeting</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">
+          {editingId ? 'Edit Omitted Meeting' : 'Add Omitted Meeting'}
+        </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Date Picker */}
@@ -128,7 +156,8 @@ export default function OmittedMeetingsPage() {
                   setFormData({ ...formData, date: e.target.value });
                   setErrors({});
                 }}
-                className={`w-full px-3 py-2 bg-gray-700 border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                disabled={editingId !== null}
+                className={`w-full px-3 py-2 bg-gray-700 border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed ${
                   errors.date ? 'border-red-500' : 'border-gray-600'
                 }`}
               />
@@ -137,27 +166,55 @@ export default function OmittedMeetingsPage() {
               )}
             </div>
 
-            {/* Reason */}
+            {/* Comment */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">
-                Reason (Optional)
+                Comment
               </label>
               <input
                 type="text"
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                placeholder="e.g., Public holiday, Special event"
+                value={formData.comment}
+                onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                placeholder="e.g., Circuit Assembly, Regional Convention"
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
+              <p className="text-xs text-gray-500 mt-1">Optional description</p>
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
-          >
-            Add Omitted Meeting
-          </button>
+          {/* Show on Schedule Toggle */}
+          <div className="border-t border-gray-700 pt-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.showOnSchedule}
+                onChange={(e) => setFormData({ ...formData, showOnSchedule: e.target.checked })}
+                className="mt-1 w-4 h-4"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-300">Show on schedule</span>
+                <p className="text-xs text-gray-500 mt-0.5">Display placeholder row with comment in schedule</p>
+              </div>
+            </label>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+            >
+              {editingId ? 'Update Omitted Meeting' : 'Add Omitted Meeting'}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="px-4 py-2 bg-gray-700 border border-gray-600 text-gray-300 rounded hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -177,26 +234,45 @@ export default function OmittedMeetingsPage() {
                   <tr className="border-b border-gray-700">
                     <th className="text-left py-3 px-4 font-semibold text-gray-300">Date</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-300">Day</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-300">Reason</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-300">Comment</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-300">Show on Schedule</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedOmittedDates.map((omittedDate) => (
-                    <tr key={omittedDate.id} className="border-b border-gray-700 hover:bg-gray-750 transition-colors">
-                      <td className="py-3 px-4 text-gray-200">{formatDate(omittedDate.date)}</td>
-                      <td className="py-3 px-4 text-gray-200">{getDayName(omittedDate.date)}</td>
-                      <td className="py-3 px-4 text-gray-400">{omittedDate.reason || '-'}</td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => handleDelete(omittedDate)}
-                          className="text-red-400 hover:text-red-300 text-sm font-medium"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {sortedOmittedDates.map((omittedDate) => {
+                    const showOnSchedule = omittedDate.showOnSchedule ?? false;
+                    const comment = omittedDate.comment || omittedDate.reason || '-'; // Handle migration
+
+                    return (
+                      <tr key={omittedDate.id} className="border-b border-gray-700 hover:bg-gray-750 transition-colors">
+                        <td className="py-3 px-4 text-gray-200">{formatDate(omittedDate.date)}</td>
+                        <td className="py-3 px-4 text-gray-200">{getDayName(omittedDate.date)}</td>
+                        <td className="py-3 px-4 text-gray-400">{comment}</td>
+                        <td className="py-3 px-4">
+                          <span className={`text-sm ${showOnSchedule ? 'text-green-400' : 'text-gray-500'}`}>
+                            {showOnSchedule ? '✓ Yes' : '✗ No'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEdit(omittedDate)}
+                              className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(omittedDate)}
+                              className="text-red-400 hover:text-red-300 text-sm font-medium"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

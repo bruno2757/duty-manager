@@ -89,7 +89,8 @@ export function createSettings() {
       midweek: 'Thursday',
       weekend: 'Sunday',
       locked: false
-    }
+    },
+    roleOrder: [] // Array of role IDs in display order
   };
 }
 

@@ -1,6 +1,6 @@
 import Papa from 'papaparse';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -285,13 +285,20 @@ function formatDateUK(date) {
 /**
  * Export schedule to CSV
  */
-export function exportScheduleToCSV(schedule, roles, people) {
+export function exportScheduleToCSV(schedule, roles, people, roleOrder = []) {
   if (!schedule || !schedule.meetings || schedule.meetings.length === 0) {
     throw new Error('No schedule to export');
   }
 
-  // Create headers dynamically from roles
-  const headers = ['Meeting No.', 'Date', 'Day', 'Comment', ...roles.map(r => r.name)];
+  // Get ordered roles (use roleOrder if provided)
+  const orderedRoles = roleOrder && roleOrder.length > 0
+    ? roleOrder
+        .map(roleId => roles.find(r => r.id === roleId))
+        .filter(Boolean)
+    : roles;
+
+  // Create headers dynamically from ordered roles
+  const headers = ['Meeting No.', 'Date', 'Day', 'Comment', ...orderedRoles.map(r => r.name)];
 
   // Create rows
   const rows = schedule.meetings.map((meeting, index) => {
@@ -299,16 +306,35 @@ export function exportScheduleToCSV(schedule, roles, people) {
       'Meeting No.': index + 1,
       'Date': formatDateUK(meeting.date),
       'Day': meeting.day,
-      'Comment': meeting.type === 'special' && meeting.comment ? meeting.comment : ''
+      'Comment': ''
     };
 
-    // Add person name for each role
-    roles.forEach(role => {
-      const duty = meeting.duties[role.id];
-      const personId = duty?.personId;
-      const person = personId ? people.find(p => p.id === personId) : null;
-      row[role.name] = person ? person.name : '';
-    });
+    // Handle different meeting types
+    if (meeting.type === 'omitted') {
+      // Omitted meeting - show comment, leave roles empty
+      row['Comment'] = meeting.comment || 'NO MEETING';
+      orderedRoles.forEach(role => {
+        row[role.name] = '';
+      });
+    } else if (meeting.type === 'special' && meeting.comment) {
+      // Special meeting with comment
+      row['Comment'] = meeting.comment;
+      // Add person names for roles
+      orderedRoles.forEach(role => {
+        const duty = meeting.duties[role.id];
+        const personId = duty?.personId;
+        const person = personId ? people.find(p => p.id === personId) : null;
+        row[role.name] = person ? person.name : '';
+      });
+    } else {
+      // Regular meeting
+      orderedRoles.forEach(role => {
+        const duty = meeting.duties[role.id];
+        const personId = duty?.personId;
+        const person = personId ? people.find(p => p.id === personId) : null;
+        row[role.name] = person ? person.name : '';
+      });
+    }
 
     return row;
   });
@@ -328,12 +354,19 @@ export function exportScheduleToCSV(schedule, roles, people) {
 }
 
 /**
- * Export schedule to PDF
+ * Export schedule to PDF with comprehensive formatting
  */
-export function exportScheduleToPDF(schedule, roles, people) {
+export function exportScheduleToPDF(schedule, roles, people, roleOrder = []) {
   if (!schedule || !schedule.meetings || schedule.meetings.length === 0) {
     throw new Error('No schedule to export');
   }
+
+  // Get ordered roles (use roleOrder if provided)
+  const orderedRoles = roleOrder && roleOrder.length > 0
+    ? roleOrder
+        .map(roleId => roles.find(r => r.id === roleId))
+        .filter(Boolean)
+    : roles;
 
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -343,70 +376,223 @@ export function exportScheduleToPDF(schedule, roles, people) {
 
   const startDate = formatDateUK(schedule.startDate);
   const endDate = formatDateUK(schedule.endDate);
+  const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Title
-  doc.setFontSize(16);
-  doc.text(`Duty Schedule ${startDate} to ${endDate}`, 14, 15);
+  // === HEADER SECTION ===
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DUTY SCHEDULE', 14, 15);
 
-  // Prepare table data
-  const headers = [['Meeting\nNo.', 'Date', 'Day', 'Comment', ...roles.map(r => r.name)]];
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${startDate} to ${endDate}`, 14, 22);
 
+  // Right-aligned info
+  doc.setFontSize(9);
+  doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, pageWidth - 14, 15, { align: 'right' });
+  doc.text(`Total Meetings: ${schedule.meetings.length}`, pageWidth - 14, 20, { align: 'right' });
+
+  // === TABLE SECTION ===
+  // Build headers
+  const headers = [[
+    'No.',
+    'Date',
+    'Day',
+    ...orderedRoles.map(r => r.name)
+  ]];
+
+  // Build data rows
   const rows = schedule.meetings.map((meeting, index) => {
     const row = [
-      index + 1,
+      meeting.meetingNo || (index + 1),
       formatDateUK(meeting.date),
-      meeting.day.substring(0, 3), // Abbreviate day name (Thu, Sun, Tue, etc.)
-      meeting.type === 'special' && meeting.comment ? meeting.comment : ''
+      meeting.day.substring(0, 3) // Thu, Sun, etc.
     ];
 
-    // Add person name for each role
-    roles.forEach(role => {
-      const duty = meeting.duties[role.id];
-      const personId = duty?.personId;
-      const person = personId ? people.find(p => p.id === personId) : null;
-      row.push(person ? person.name : '-');
+    // Add role assignments in order
+    orderedRoles.forEach(role => {
+      if (meeting.type === 'omitted') {
+        // Show "NO MEETING" in first role column only
+        row.push('');
+      } else {
+        const duty = meeting.duties[role.id];
+        const personId = duty?.personId;
+        const person = personId ? people.find(p => p.id === personId) : null;
+        row.push(person ? person.name : '-');
+      }
     });
 
     return row;
   });
 
-  // Add table
-  doc.autoTable({
+  // Generate table with enhanced styling
+  autoTable(doc, {
     head: headers,
     body: rows,
-    startY: 25,
+    startY: 28,
+
+    // Styling
+    theme: 'grid',
     styles: {
       fontSize: 8,
-      cellPadding: 2
+      cellPadding: 2,
+      overflow: 'linebreak',
+      cellWidth: 'auto'
     },
+
     headStyles: {
-      fillColor: [66, 139, 202],
-      fontStyle: 'bold'
+      fillColor: [41, 128, 185], // Blue header
+      textColor: 255,
+      fontStyle: 'bold',
+      halign: 'center'
     },
+
     columnStyles: {
-      0: { cellWidth: 12 }, // Meeting No.
-      1: { cellWidth: 20 }, // Date
-      2: { cellWidth: 12 }, // Day
-      3: { cellWidth: 30 }  // Comment
+      0: { cellWidth: 10, halign: 'center' },  // Meeting No.
+      1: { cellWidth: 22, halign: 'center' },  // Date
+      2: { cellWidth: 20, halign: 'center' }   // Day
+      // Role columns auto-width
     },
-    margin: { top: 25 }
+
+    // Alternate row colors
+    alternateRowStyles: {
+      fillColor: [245, 245, 245]
+    },
+
+    // Special row styling
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.row.index < schedule.meetings.length) {
+        const meeting = schedule.meetings[data.row.index];
+
+        // Style omitted meeting rows
+        if (meeting.type === 'omitted') {
+          data.cell.styles.fillColor = [220, 220, 220];
+          data.cell.styles.fontStyle = 'italic';
+          data.cell.styles.textColor = [100, 100, 100];
+
+          // Show "NO MEETING" message in merged cells
+          if (data.column.index === 3) {
+            data.cell.text = [`NO MEETING${meeting.comment ? ` - ${meeting.comment}` : ''}`];
+            data.cell.colSpan = orderedRoles.length;
+          } else if (data.column.index > 3) {
+            // Hide other role columns for omitted meetings
+            data.cell.text = [''];
+          }
+        }
+
+        // Style special meeting rows
+        if (meeting.type === 'special') {
+          data.cell.styles.fillColor = [255, 248, 220]; // Light yellow
+        }
+
+        // Highlight unfilled roles
+        if (data.column.index >= 3 && meeting.type !== 'omitted') {
+          const roleIndex = data.column.index - 3;
+          const role = orderedRoles[roleIndex];
+          const duty = meeting.duties[role?.id];
+
+          if (!duty?.personId) {
+            data.cell.styles.textColor = [200, 0, 0]; // Red for unfilled
+            data.cell.styles.fontStyle = 'italic';
+          }
+        }
+      }
+    },
+
+    // Page numbering
+    showHead: 'everyPage',
+    didDrawPage: (data) => {
+      const pageCount = doc.internal.getNumberOfPages();
+      const pageNum = doc.internal.getCurrentPageInfo().pageNumber;
+
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Page ${pageNum} of ${pageCount}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    },
+
+    margin: { top: 28, left: 14, right: 14, bottom: 20 }
   });
 
-  // Footer with statistics
-  const finalY = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(10);
-  doc.text(`Total meetings: ${schedule.meetings.length}`, 14, finalY);
-  doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, 14, finalY + 6);
+  // === STATISTICS SECTION ===
+  let finalY = (doc.lastAutoTable?.finalY || 100) + 10;
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  if (schedule.conflicts && schedule.conflicts.length > 0) {
-    doc.setTextColor(255, 0, 0);
-    doc.text(`Conflicts: ${schedule.conflicts.length}`, 14, finalY + 12);
+  // Check if we need a new page for statistics
+  if (finalY + 40 > pageHeight) {
+    doc.addPage();
+    finalY = 20;
   }
 
-  // Download
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('STATISTICS', 14, finalY);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  finalY += 6;
+
+  // Calculate statistics
+  const regularCount = schedule.meetings.filter(m => m.type === 'regular').length;
+  const specialCount = schedule.meetings.filter(m => m.type === 'special').length;
+  const omittedCount = schedule.meetings.filter(m => m.type === 'omitted').length;
+
+  const statsText = [
+    `Total People: ${people.length}`,
+    `Total Roles: ${roles.length}`,
+    `Regular Meetings: ${regularCount}`,
+    `Special Meetings: ${specialCount}`,
+    `Omitted Dates: ${omittedCount}`
+  ];
+
+  statsText.forEach(text => {
+    doc.text(`• ${text}`, 14, finalY);
+    finalY += 5;
+  });
+
+  // === CONFLICTS/WARNINGS SECTION ===
+  if (schedule.conflicts && schedule.conflicts.length > 0) {
+    finalY += 5;
+
+    // Add new page if needed
+    if (finalY + 20 > pageHeight) {
+      doc.addPage();
+      finalY = 20;
+    }
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(200, 0, 0); // Red
+    doc.text('CONFLICTS & WARNINGS', 14, finalY);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    finalY += 6;
+
+    // Show first 10 conflicts
+    const conflictsToShow = schedule.conflicts.slice(0, 10);
+    conflictsToShow.forEach(conflict => {
+      const message = conflict.message || 'Unknown conflict';
+      doc.text(`• ${message}`, 14, finalY, { maxWidth: pageWidth - 28 });
+      finalY += 5;
+    });
+
+    if (schedule.conflicts.length > 10) {
+      doc.setTextColor(100, 100, 100);
+      doc.text(`... and ${schedule.conflicts.length - 10} more warning(s)`, 14, finalY);
+    }
+  }
+
+  // === SAVE PDF ===
   const startDateStr = new Date(schedule.startDate).toISOString().split('T')[0];
   const endDateStr = new Date(schedule.endDate).toISOString().split('T')[0];
-  const filename = `schedule_${startDateStr}_to_${endDateStr}.pdf`;
+  const filename = `Duty_Schedule_${startDateStr}_to_${endDateStr}.pdf`;
 
   doc.save(filename);
 }
