@@ -13,7 +13,7 @@ import SpecialMeetingsPage from './pages/meetingCustomisation/SpecialMeetingsPag
 export default function App() {
   return (
     <AppProvider>
-      <BrowserRouter>
+      <BrowserRouter basename="/duty">
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />

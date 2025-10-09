@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { createSettings } from '../data/models';
+import { loadData, saveData } from '../services/api';
 
 const AppContext = createContext();
 
@@ -46,44 +47,81 @@ export function AppProvider({ children }) {
   const [omittedDates, setOmittedDates] = useState([]);
   const [specialMeetings, setSpecialMeetings] = useState([]);
 
-  // Initialize data on mount
+  // Initialize data on mount - try backend first, fallback to localStorage
   useEffect(() => {
-    // Try to load from localStorage
-    const savedData = localStorage.getItem('dutyManagerData');
-
-    if (savedData) {
+    async function loadFromBackend() {
       try {
-        const parsed = JSON.parse(savedData);
+        console.log('🔄 Loading data from backend...');
+        const backendData = await loadData();
 
-        // Migrate old data if needed
-        const migrated = migrateData(parsed);
+        if (backendData && Object.keys(backendData).length > 0) {
+          // Backend has data - use it
+          const migrated = migrateData(backendData);
 
-        setPeople(migrated.people || []);
-        setRoles(migrated.roles || []);
-        setSchedule(migrated.schedule || null);
-        setCancelledDates(migrated.cancelledDates || []);
-        setSettings(migrated.settings || createSettings());
-        setOmittedDates(migrated.omittedDates || []);
-        setSpecialMeetings(migrated.specialMeetings || []);
+          setPeople(migrated.people || []);
+          setRoles(migrated.roles || []);
+          setSchedule(migrated.schedule || null);
+          setCancelledDates(migrated.cancelledDates || []);
+          setSettings(migrated.settings || createSettings());
+          setOmittedDates(migrated.omittedDates || []);
+          setSpecialMeetings(migrated.specialMeetings || []);
 
-        // Auto-cleanup past omitted dates
-        cleanupPastOmittedDates(migrated.omittedDates || []);
+          // Auto-cleanup past omitted dates
+          cleanupPastOmittedDates(migrated.omittedDates || []);
+          console.log('✓ Data loaded from backend');
+        } else {
+          // Backend has no data - try localStorage
+          console.log('ℹ No backend data, trying localStorage...');
+          const savedData = localStorage.getItem('dutyManagerData');
+
+          if (savedData) {
+            const parsed = JSON.parse(savedData);
+            const migrated = migrateData(parsed);
+
+            setPeople(migrated.people || []);
+            setRoles(migrated.roles || []);
+            setSchedule(migrated.schedule || null);
+            setCancelledDates(migrated.cancelledDates || []);
+            setSettings(migrated.settings || createSettings());
+            setOmittedDates(migrated.omittedDates || []);
+            setSpecialMeetings(migrated.specialMeetings || []);
+
+            cleanupPastOmittedDates(migrated.omittedDates || []);
+            console.log('✓ Data loaded from localStorage');
+          } else {
+            console.log('ℹ No data found, starting fresh');
+          }
+        }
       } catch (error) {
-        console.error('Error loading saved data:', error);
-        // Start with empty data if localStorage is corrupted
-        setPeople([]);
-        setRoles([]);
-        setSchedule(null);
-        setCancelledDates([]);
-        setSettings(createSettings());
-        setOmittedDates([]);
-        setSpecialMeetings([]);
+        console.error('✗ Backend failed, falling back to localStorage:', error);
+        // Backend failed - use localStorage
+        try {
+          const savedData = localStorage.getItem('dutyManagerData');
+          if (savedData) {
+            const parsed = JSON.parse(savedData);
+            const migrated = migrateData(parsed);
+
+            setPeople(migrated.people || []);
+            setRoles(migrated.roles || []);
+            setSchedule(migrated.schedule || null);
+            setCancelledDates(migrated.cancelledDates || []);
+            setSettings(migrated.settings || createSettings());
+            setOmittedDates(migrated.omittedDates || []);
+            setSpecialMeetings(migrated.specialMeetings || []);
+
+            cleanupPastOmittedDates(migrated.omittedDates || []);
+            console.log('✓ Data loaded from localStorage (fallback)');
+          }
+        } catch (localError) {
+          console.error('✗ localStorage also failed:', localError);
+        }
       }
     }
-    // If no saved data, start with empty arrays (no automatic initial load)
+
+    loadFromBackend();
   }, []);
 
-  // Auto-save to localStorage every time data changes (but only if we have data)
+  // Auto-save to backend AND localStorage every time data changes (but only if we have data)
   useEffect(() => {
     if (people.length > 0 || roles.length > 0) {
       const dataToSave = {
@@ -98,6 +136,12 @@ export function AppProvider({ children }) {
         lastSaved: new Date().toISOString()
       };
 
+      // Save to backend (debounced in the saveData function)
+      saveData(dataToSave).catch(err => {
+        console.error('✗ Failed to save to backend:', err);
+      });
+
+      // Also keep localStorage as backup
       localStorage.setItem('dutyManagerData', JSON.stringify(dataToSave));
     }
   }, [people, roles, schedule, cancelledDates, settings, omittedDates, specialMeetings]);

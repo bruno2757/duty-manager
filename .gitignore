@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backend data and backups
+data/
+*.backup
+*.tar.gz
+
+# Temporary files
+troubleshooting/
+ngrok.yml
+.claude/

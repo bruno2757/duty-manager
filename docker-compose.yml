@@ -1,0 +1,25 @@
+services:
+  duty-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: duty-manager
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./data:/data  # Persistent data storage
+    networks:
+      - shared-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    environment:
+      - PYTHONUNBUFFERED=1
+
+networks:
+  shared-network:
+    external: true

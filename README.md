@@ -71,22 +71,51 @@ A web-based scheduling application for managing worship service duties. Generate
 
 - **Frontend Framework**: React 18.x (functional components with Hooks)
 - **Styling**: Tailwind CSS (dark theme, responsive design)
-- **Data Handling**: 
+- **Data Handling**:
   - PapaParse (CSV parsing)
   - jsPDF + jsPDF-AutoTable (PDF generation)
   - Native JavaScript Date objects
 - **State Management**: React Context API
-- **Data Persistence**: JSON file download/upload (no backend required)
+- **Data Persistence**:
+  - Flask backend API with JSON file storage
+  - localStorage fallback for offline resilience
+  - Automatic backup system
+- **Deployment**: Docker with nginx + supervisor
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 16.x or higher
-- npm or yarn package manager
+- Docker and Docker Compose (for production deployment)
+- Node.js 20.x or higher (for local development)
+- Python 3.11+ (for backend development)
 
-### Installation
+### Production Deployment (Docker)
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/duty-manager.git
+   cd duty-manager
+   ```
+
+2. **Build and start containers**
+   ```bash
+   docker compose build --no-cache
+   docker compose up -d
+   ```
+
+3. **Access the application**
+   - Direct: `http://your-server:8081/duty/`
+   - Via proxy: `http://your-server:8082/duty/`
+
+4. **Check health**
+   ```bash
+   docker ps  # Should show "healthy" status
+   curl http://localhost:8081/api/health
+   ```
+
+### Local Development
 
 1. **Clone the repository**
    ```bash
@@ -97,16 +126,23 @@ A web-based scheduling application for managing worship service duties. Generate
 2. **Install dependencies**
    ```bash
    npm install
+   pip install -r backend/requirements.txt
    ```
 
-3. **Start development server**
+3. **Start backend**
+   ```bash
+   cd backend
+   python app.py
+   ```
+
+4. **Start frontend (in new terminal)**
    ```bash
    npm run dev
    ```
 
-4. **Open in browser**
+5. **Open in browser**
    ```
-   http://localhost:5173
+   http://localhost:5173/duty/
    ```
 
 ### Build for Production
@@ -236,21 +272,31 @@ duty-manager/
 ## 💾 Data Management
 
 ### Data Persistence
-- **Primary Method**: JSON file download/upload
-- **User Responsibility**: Save JSON files regularly
-- **No Backend**: All data stored client-side during session
-- **Portability**: JSON files work across devices/browsers
+- **Backend Storage**: Flask API saves data to `/data/schedule.json`
+- **localStorage Fallback**: Browser storage for offline resilience
+- **Automatic Backups**: Created before each save in `/data/backups/`
+- **JSON Export/Import**: Download/upload for data portability
+
+### Load Strategy
+1. Try to load from backend API
+2. If backend returns empty, fall back to localStorage
+3. If both empty, start with fresh state
+
+### Save Strategy
+- Save to backend (debounced 1 second) and localStorage (immediate)
+- Backend saves trigger automatic backup creation
+- Graceful degradation if backend unavailable
 
 ### Data Security
 - No authentication required (single admin use)
-- No data sent to external servers
-- All processing happens client-side
-- User maintains control of data files
+- All data stays on your server
+- No external API calls
+- User maintains control via JSON exports
 
 ### Backup Recommendations
-1. Download JSON after significant changes
-2. Keep multiple versions (date-stamped filenames)
-3. Store backups in cloud storage (Google Drive, Dropbox, etc.)
+1. Container data persists in `./data` volume
+2. Export JSON regularly for off-server backups
+3. Automatic backups in `/data/backups/` directory
 4. Export CSV/PDF for external records
 
 ---
@@ -375,8 +421,18 @@ For questions, issues, or suggestions:
 
 ## 📝 Changelog
 
-### Version 1.0.0 (2025-10-05)
-- ✅ Initial release
+### Version 2.0.0 (2025-10-09) - Backend Integration
+- ✅ Flask backend API for persistent storage
+- ✅ Dual-storage strategy (backend + localStorage)
+- ✅ Automatic backup system
+- ✅ Debounced API saves (1 second)
+- ✅ Multi-stage Docker build
+- ✅ Nginx + supervisor process management
+- ✅ Graceful degradation on backend failure
+- ✅ Docker Compose deployment
+- ✅ Health check endpoints
+
+### Version 1.0.0 (2025-10-05) - Initial Release
 - ✅ Core scheduling algorithm (CSP)
 - ✅ Role and people management
 - ✅ Availability tracking
